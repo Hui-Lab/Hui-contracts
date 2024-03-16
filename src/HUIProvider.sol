@@ -4,7 +4,7 @@ import "./HUIToken.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract Vault is Ownable {
+contract HUIProvider is Ownable {
     HUIToken public hui;
     ERC20[] public underlyingTokens;
 

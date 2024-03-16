@@ -62,10 +62,14 @@ contract HUIVault {
         managerClaimable += remain;
     }
 
+    function isExpired(address user) public view returns (bool) {
+        return block.timestamp > getNextPaymentTime(user) && userDetails[user].balance < finalBalance;
+    }
+
     function updateUser(address user) public {
         if (userEntry.contains(user) == false) return;
-        if (block.timestamp > getNextPaymentTime() && userDetails[user].balance < finalBalance) {
-            require(userDetails[user].expired == false);
+        if (block.timestamp > getNextPaymentTime(user) && userDetails[user].balance < finalBalance) {
+            require(userDetails[user].expired == false, "Logic error");
             userDetails[user].expired = true;
         }
         if (userDetails[user].expired == true) {
@@ -89,9 +93,8 @@ contract HUIVault {
         return 1 days;
     }
 
-    function getNextPaymentTime() public view returns (uint256) {
-        return userDetails[msg.sender].entryTime
-            + userDetails[msg.sender].currentPaymentTime * userDetails[msg.sender].period;
+    function getNextPaymentTime(address user) public view returns (uint256) {
+        return userDetails[user].entryTime + userDetails[user].currentPaymentTime * userDetails[user].period;
     }
 
     function getAmountNeedToPay() public view returns (uint256) {
@@ -106,9 +109,8 @@ contract HUIVault {
             amountPerPeriod > 0 && amountPerPeriod <= hui.balanceOf(msg.sender),
             "amountPerPeriod must be greater than 0 and less than or equal to the balance of the user"
         );
-        require(
-            amountPerPeriod * period >= finalBalance, "amountPerPeriod * period must be greater than or equal to finalBalance"
-        );
+        uint256 maximumTime = finalBalance / amountPerPeriod + (finalBalance % amountPerPeriod == 0 ? 0 : 1);
+        require(period * maximumTime <= 365 days, "The total time to pay must be less than or equal to 365 days");
         require(userEntry.contains(msg.sender) == false, "User should pay, not entry");
         hui.transferFrom(msg.sender, address(this), amountPerPeriod);
         userDetails[msg.sender] = UserDetail({
@@ -122,28 +124,31 @@ contract HUIVault {
         userEntry.add(msg.sender);
     }
 
-    function pay() public {
+    function pay(uint256 amount) public {
         updateUser(msg.sender);
         require(userDetails[msg.sender].balance < finalBalance, "You pay total fee needed");
         require(userEntry.contains(msg.sender) == true, "User should entry, not pay");
-        hui.transferFrom(msg.sender, address(this), userDetails[msg.sender].amountPerPeriod);
-        userDetails[msg.sender].balance += userDetails[msg.sender].amountPerPeriod;
+        require(
+            amount >= userDetails[msg.sender].amountPerPeriod, "Amount must be greater than or equal to amountPerPeriod"
+        );
+        hui.transferFrom(msg.sender, address(this), amount);
+        userDetails[msg.sender].balance += amount;
         userDetails[msg.sender].currentPaymentTime++;
     }
 
     function withdraw() public {
-        updateUser(msg.sender);
-        require(userDetails[msg.sender].balance >= finalBalance, "You should pay all fee needed");
         require(userEntry.contains(msg.sender) == true, "User should entry, not withdraw");
+        updateUser(msg.sender);
+        require(userDetails[msg.sender].balance >= finalBalance, "You should pay all fee needed or entry again");
         hui.transfer(msg.sender, userDetails[msg.sender].balance);
         delete userDetails[msg.sender];
         userEntry.remove(msg.sender);
     }
 
     function getRewardAndWithdraw() public {
-        updateUser(msg.sender);
-        require(userDetails[msg.sender].balance >= finalBalance, "You should pay all fee needed");
         require(userEntry.contains(msg.sender) == true, "User should entry, not withdraw");
+        updateUser(msg.sender);
+        require(userDetails[msg.sender].balance >= finalBalance, "You should pay all fee needed or entry again");
         updateAllUsers();
         hui.transfer(msg.sender, userDetails[msg.sender].balance);
         delete userDetails[msg.sender];

@@ -7,12 +7,15 @@ import {HUIProvider} from "../src/contracts/HUIProvider.sol";
 import {HUIVault} from "../src/contracts/HUIVault.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {NGU} from "./NGU.sol";
+import {FlashBorrower} from "../src/samples/FlashBorrower.sol";
+import {IFlashBorrower} from "../src/interfaces/IFlashBorrower.sol";
 
 contract HUIVaultTest is Test {
     HUIToken hui;
     HUIProvider provider;
     HUIVault vault;
     ERC20 coin;
+    FlashBorrower borrower;
 
     address public player1 = 0x9c065bdc5a4a9e589Ae7DD555D66E99bb7E9ADe6;
     address public player2 = 0x4a8e79E5258592f208ddba8A8a0d3ffEB051B10A;
@@ -28,6 +31,9 @@ contract HUIVaultTest is Test {
         coin = new NGU();
         provider.expandUnderlyingTokens(address(coin));
         vm.stopPrank();
+
+        borrower = new FlashBorrower(address(provider), address(coin));
+        deal(address(coin), address(borrower), 1000);
     }
 
     function testPay() public {
@@ -118,6 +124,17 @@ contract HUIVaultTest is Test {
             vault.pay(50);
         }
         vault.withdraw();
+        vm.stopPrank();
+    }
+
+    function testFlashLoan() public {
+        testPay();
+        hoax(address(borrower));
+        hui.approve(address(vault), 1001);
+        vm.startPrank(player1);
+        bytes memory data =
+            abi.encodeWithSelector(FlashBorrower.onFlashLoan.selector, address(0), address(coin), 100, 0, "");
+        vault.flashLoan(IFlashBorrower(address(borrower)), 1000, data);
         vm.stopPrank();
     }
 }

@@ -39,6 +39,7 @@ contract HUIVault is IFlashLender, Ownable {
 
     /** See IFlashLender */
     function flashLoan(IFlashBorrower receiver, uint256 amount, bytes calldata data) external returns (bool) {
+        require(amount <= maxFlashLoan(), "FlashLender: Amount exceeds max");
         uint256 fee = flashFee(amount);
         require(hui.transfer(address(receiver), amount), "FlashLender: Transfer failed");
         require(
@@ -51,11 +52,11 @@ contract HUIVault is IFlashLender, Ownable {
 
     /** See IFlashLender */
     function flashFee(uint256 amount) public view returns (uint256) {
-        return amount * feeProportion / 10000;
+        return (amount * feeProportion + DECIMALS - 1) / DECIMALS;
     }
 
     /** See IFlashLender */
-    function maxFlashLoan() external view returns (uint256) {
+    function maxFlashLoan() public view returns (uint256) {
         return hui.balanceOf(address(this));
     }
 

@@ -23,7 +23,7 @@ contract HUIVaultTest is Test {
         vm.startPrank(address(this));
         provider = new HUIProvider(address(hui));
         hui.setProvider(address(provider));
-        vault = new HUIVault(address(hui), 1000);
+        vault = new HUIVault(address(hui), 1000, 1);
         vm.stopPrank();
         coin = new NGU();
     }

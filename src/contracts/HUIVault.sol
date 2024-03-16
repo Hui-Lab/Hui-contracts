@@ -2,10 +2,17 @@
 pragma solidity ^0.8.21;
 
 import "./HUIToken.sol";
+import "../interfaces/IFlashLender.sol";
+import "../interfaces/IFlashBorrower.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract HUIVault {
+contract HUIVault is IFlashLender, Ownable {
     using EnumerableSet for EnumerableSet.AddressSet;
+
+    bytes32 public constant CALLBACK_SUCCESS = keccak256("FlashBorrower.onFlashLoan");
+    uint256 public constant DECIMALS = 10000;
+    uint256 public immutable feeProportion; //  1 == 0.01%.
 
     HUIToken public immutable hui;
 
@@ -23,12 +30,33 @@ contract HUIVault {
 
     uint256 public finalBalance = 0;
     uint256 public managerClaimable = 0;
-    address public manager;
 
-    constructor(address _hui, uint256 _finalBalance) {
+    constructor(address _hui, uint256 _finalBalance, uint256 _feeProportion) Ownable(_msgSender()) {
         hui = HUIToken(_hui);
         finalBalance = _finalBalance;
-        manager = msg.sender;
+        feeProportion = _feeProportion;
+    }
+
+    /** See IFlashLender */
+    function flashLoan(IFlashBorrower receiver, uint256 amount, bytes calldata data) external returns (bool) {
+        uint256 fee = flashFee(amount);
+        require(hui.transfer(address(receiver), amount), "FlashLender: Transfer failed");
+        require(
+            receiver.onFlashLoan(msg.sender, address(hui), amount, fee, data) == CALLBACK_SUCCESS,
+            "FlashLender: Callback failed"
+        );
+        require(hui.transferFrom(address(receiver), address(this), amount + fee), "FlashLender: Repay failed");
+        return true;
+    }
+
+    /** See IFlashLender */
+    function flashFee(uint256 amount) public view returns (uint256) {
+        return amount * feeProportion / 10000;
+    }
+
+    /** See IFlashLender */
+    function maxFlashLoan() external view returns (uint256) {
+        return hui.balanceOf(address(this));
     }
 
     function getNumberOfCompletedUser() public view returns (uint256) {
@@ -40,9 +68,8 @@ contract HUIVault {
         return Count;
     }
 
-    function managerClaim() public {
-        require(msg.sender == manager, "only manager can claim reward");
-        hui.transfer(manager, managerClaimable);
+    function managerClaim() public onlyOwner() {
+        hui.transfer(owner(), managerClaimable);
     }
 
     function distribute(address expiredUser) internal {

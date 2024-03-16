@@ -100,6 +100,26 @@ contract HUIVault is IFlashLender, Ownable {
         return block.timestamp > getNextPaymentTime(user) && userDetails[user].balance < finalBalance;
     }
 
+    function isUserEntry(address user) public view returns (bool) {
+        return !userEntry.contains(user) || isExpired(user);
+    }
+
+    function getBalance(address user) public view returns (uint256) {
+        return userDetails[user].balance;
+    }
+
+    function getCurrentReward() public view returns (uint256) {
+        uint256 numberCompletedUserInVault = getNumberOfCompletedUser();
+        if (numberCompletedUserInVault == 0) return 0;
+        uint256 eachPrize = 0;
+        for (uint256 i = 0; i < userEntry.length(); ++i) {
+            if (isExpired(userEntry.at(i))) {
+                eachPrize += userDetails[userEntry.at(i)].balance / (numberCompletedUserInVault * 2);
+            }
+        }
+        return eachPrize;
+    }
+
     function updateUser(address user) public {
         if (userEntry.contains(user) == false) return;
         if (block.timestamp > getNextPaymentTime(user) && userDetails[user].balance < finalBalance) {

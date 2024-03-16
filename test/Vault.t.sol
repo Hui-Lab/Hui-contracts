@@ -24,31 +24,99 @@ contract HUIVaultTest is Test {
         provider = new HUIProvider(address(hui));
         hui.setProvider(address(provider));
         vault = new HUIVault(address(hui), 1000);
-        vm.stopPrank();
         coin = new NGU();
+        provider.expandUnderlyingTokens(address(coin));
+        vm.stopPrank();
     }
 
     function testPay() public {
-        provider.expandUnderlyingTokens(address(coin));
         deal(address(coin), player1, 1000);
-        deal(address(coin), player2, 1000);
-        console.log("player1 balance", coin.balanceOf(player1));
-        console.log("player2 balance", coin.balanceOf(player2));
+        deal(address(coin), player2, 2000);
+        //
         hoax(player1);
         coin.approve(address(provider), 1000);
-        vm.prank(player1);
+        hoax(player1);
         provider.deposit(address(coin), 1000);
         hoax(player2);
         coin.approve(address(provider), 1000);
-        vm.prank(player2);
+        hoax(player2);
         provider.deposit(address(coin), 1000);
+        //
         vm.startPrank(player1);
         hui.approve(address(vault), 100);
         vault.entryHui(1 days, 100);
-        skip(1 days);
-        hui.approve(address(vault), 100);
-        vault.pay();
+        for (uint256 i = 0; i < 9; ++i) {
+            skip(1 days);
+            hui.approve(address(vault), 100);
+            vault.pay(100);
+        }
         vm.stopPrank();
-        console.log("player1 balance", coin.balanceOf(player1));
+        vm.startPrank(player2);
+        hui.approve(address(vault), 100);
+        vault.entryHui(1 days, 100);
+        for (uint256 i = 0; i < 8; ++i) {
+            skip(1 days);
+            hui.approve(address(vault), 100);
+            vault.pay(100);
+        }
+        vm.stopPrank();
+        skip(1 days + 1);
+        assertEq(hui.balanceOf(player1), 0);
+        assertEq(hui.balanceOf(player2), 100);
+        assertEq(vault.isExpired(player2), true);
+    }
+
+    function testWithdraw() public {
+        testPay();
+        try vault.withdraw() {
+            assert(false);
+        } catch Error(string memory reason) {
+            assertEq(reason, "User should entry, not withdraw");
+        }
+        hoax(player2);
+        try vault.withdraw() {
+            assert(false);
+        } catch Error(string memory reason) {
+            assertEq(reason, "You should pay all fee needed or entry again");
+        }
+
+        hoax(player1);
+        vault.withdraw();
+        assertEq(hui.balanceOf(player1), 1000);
+    }
+
+    function testWithdrawWithReward() public {
+        testPay();
+        try vault.getRewardAndWithdraw() {
+            assert(false);
+        } catch Error(string memory reason) {
+            assertEq(reason, "User should entry, not withdraw");
+        }
+        hoax(player2);
+        try vault.getRewardAndWithdraw() {
+            assert(false);
+        } catch Error(string memory reason) {
+            assertEq(reason, "You should pay all fee needed or entry again");
+        }
+
+        hoax(player1);
+        vault.getRewardAndWithdraw();
+        assertEq(hui.balanceOf(player1), 1450);
+    }
+
+    function testEntry() public {
+        testWithdraw();
+        vm.startPrank(player2);
+        coin.approve(address(provider), 1000);
+        provider.deposit(address(coin), 1000);
+        hui.approve(address(vault), 50);
+        vault.entryHui(3 days, 50);
+        for (uint256 i = 0; i < 19; ++i) {
+            skip(3 days);
+            hui.approve(address(vault), 50);
+            vault.pay(50);
+        }
+        vault.withdraw();
+        vm.stopPrank();
     }
 }

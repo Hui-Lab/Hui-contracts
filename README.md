@@ -1,4 +1,4 @@
 create HUI Token
-create Vault
-grant minter role for Vault
-setup vault
+create HUI Provider
+grant minter role for HUI Provider
+setup HUI Provider

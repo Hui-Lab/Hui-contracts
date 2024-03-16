@@ -9,7 +9,7 @@ contract Deploy is Script {
         uint256 private_key = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(private_key);
         console.log("Deploying Token contract...");
-        Token token = new Token();
+        HUIToken token = new HUIToken();
         console.log("Token address: %s", address(token));
         vm.stopBroadcast();
     }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.21;
+pragma solidity ^0.8.20;
 
 import "./HUIToken.sol";
 import "../interfaces/IFlashLender.sol";
@@ -37,7 +37,9 @@ contract HUIVault is IFlashLender, Ownable {
         feeProportion = _feeProportion;
     }
 
-    /** See IFlashLender */
+    /**
+     * See IFlashLender
+     */
     function flashLoan(IFlashBorrower receiver, uint256 amount, bytes calldata data) external returns (bool) {
         require(amount <= maxFlashLoan(), "FlashLender: Amount exceeds max");
         uint256 fee = flashFee(amount);
@@ -50,12 +52,16 @@ contract HUIVault is IFlashLender, Ownable {
         return true;
     }
 
-    /** See IFlashLender */
+    /**
+     * See IFlashLender
+     */
     function flashFee(uint256 amount) public view returns (uint256) {
         return (amount * feeProportion + DECIMALS - 1) / DECIMALS;
     }
 
-    /** See IFlashLender */
+    /**
+     * See IFlashLender
+     */
     function maxFlashLoan() public view returns (uint256) {
         return hui.balanceOf(address(this));
     }
@@ -69,7 +75,7 @@ contract HUIVault is IFlashLender, Ownable {
         return Count;
     }
 
-    function managerClaim() public onlyOwner() {
+    function managerClaim() public onlyOwner {
         hui.transfer(owner(), managerClaimable);
     }
 

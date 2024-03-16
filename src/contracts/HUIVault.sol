@@ -155,7 +155,7 @@ contract HUIVault is IFlashLender, Ownable {
         return (userDetails[msg.sender].currentPaymentTime + 1) * userDetails[msg.sender].amountPerPeriod;
     }
 
-    function entryHui(uint256 period, uint256 amountPerPeriod) public {
+    function entryVault(uint256 period, uint256 amountPerPeriod) public {
         updateUser(msg.sender);
         require(period <= maximumPeriod() && period >= minimumPeriod(), "Period must be between 1 day and 365 days");
         require(period % 1 days == 0, "Period must be a multiple of 1 day");
